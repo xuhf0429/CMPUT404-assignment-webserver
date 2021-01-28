@@ -1,5 +1,4 @@
-#  coding: utf-8 
-import socketserver
+import socketserver, os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -28,11 +27,62 @@ import socketserver
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
+
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        request = self.data.split()
+        request_method = request[0].decode('utf-8')
+        request_path = request[1].decode('utf-8')
+        location = "http://127.0.0.1:8080" + request_path + "/\n\n"
+
+        if (request_method != "GET"):
+            stat_code = "HTTP/1.1 405 Method Not Allowed\nContent Type: text/html"
+            self.request.sendall(bytearray(stat_code, 'utf-8'))
+            return
+        
+        current_directory = os.path.abspath(os.getcwd()+'/www')
+        full_path = current_directory + request_path
+        location = "http://127.0.0.1:8080" + request_path + "/\n\n"
+        
+        if (os.path.isfile(full_path)):
+            if full_path.endswith(".html"):
+                mime_type = "text/html"
+                content = open(full_path, 'r').read()
+                stat_code = ("HTTP/1.1 200 OK\nContent-Type:" +mime_type+"\nConnection: closed\n\n"+content)
+                self.request.sendall(bytearray(stat_code, 'utf-8'))
+                    
+            elif full_path.endswith(".css"):
+                mime_type = "text/css"
+                content = open(full_path, 'r').read()
+                stat_code = ("HTTP/1.1 200 OK\nContent-Type:" +mime_type+"\nConnection: closed\n\n"+content)
+                self.request.sendall(bytearray(stat_code, 'utf-8'))
+                    
+            else:
+                mime_type = "text/html"
+                stat_code = ("HTTP/1.1 404 Not Found\nContent-Type:" + mime_type + "\nConnection: closed\n\n")
+                self.request.sendall(bytearray(stat_code, 'utf-8'))
+
+        elif (os.path.isdir(full_path)):
+            if full_path.endswith("/"):
+                full_path += "index.html"
+                mime_type = "text/html"
+                content = open(full_path, 'r').read()
+                stat_code = ("HTTP/1.1 200 OK\nContent-Type:" +mime_type+"\nConnection: closed\n\n"+content)
+                self.request.sendall(bytearray(stat_code, 'utf-8'))
+
+            else:
+                full_path = request_path + "/"
+                stat_code = ("HTTP/1.1 301 Moved Permanently\nLocation:"+location)
+                self.request.sendall(bytearray(stat_code, 'utf-8'))
+                
+        else:
+            mime_type = "text/html"
+            stat_code = ("HTTP/1.1 404 Not Found\nContent Type:" +mime_type+"\nConnection: closed\n\n")
+            self.request.sendall(bytearray(stat_code, 'utf-8'))
+            return
+                
+            
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
